@@ -195,7 +195,7 @@ resource "aws_dynamodb_table" "users" {
 
   attribute {
     name = "userId"
-    type = "S" # Matches the Node.js application config (email as string string key)
+    type = "S" # Matches the Node.js application configure (email as string string key)
   }
 
   tags = {
