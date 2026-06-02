@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signup-app
+  labels:
+    app: signup-app
+spec:
+  replicas: 2 # Standard for high availability across your subnets
+  selector:
+    matchLabels:
+      app: signup-app
+  template:
+    metadata:
+      labels:
+        app: signup-app
+    spec:
+      containers:
+      - name: signup-app
+        # The pipeline will automatically overwrite the 'latest' tag with the specific GitHub commit SHA
+        image: 352183399586.dkr.ecr.us-east-1.amazonaws.com/cloud-signup-app:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: DATABASE_TABLE
+          value: "cloud-signup-prod-users-table"
+        - name: AWS_REGION
+          value: "us-east-1"
+        # Health checks: Tells K8s if your app is actually working
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 20

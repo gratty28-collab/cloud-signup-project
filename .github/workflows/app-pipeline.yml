@@ -1,0 +1,73 @@
+name: "2. Application Continuous Deployment"
+
+# Trigger strategy: Run ONLY when code inside 'application/' or 'kubernetes/' folders changes on main branch
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'application/**'
+      - 'kubernetes/**'
+
+jobs:
+  build-and-deploy:
+    name: "Build, Push & Deploy"
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: 'us-east-1'
+      ECR_REPOSITORY: 'cloud-signup-app'
+      EKS_CLUSTER_NAME: 'cloud-signup-prod-cluster'
+
+    steps:
+      # Step 1: Clone the repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Log into Amazon ECR securely
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Step 3: Build, Tag, and Push Docker Image to ECR
+      # Using the GitHub Commit SHA as the image tag ensures every deployment is unique and traceable
+      - name: Build, Tag, and Push Image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./application
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          # Tag it as 'latest' as well for convenience
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest ./application
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      # Step 4: Authenticate kubectl with your EKS Cluster
+      - name: Update Kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+
+      # Step 5: Replace placeholder image with the newly built unique image tag
+      - name: Update Kubernetes Manifest Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          sed -i "s|image: .*|image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g" kubernetes/deployment.yml
+
+      # Step 6: Deploy to Kubernetes Cluster
+      - name: Deploy to EKS Cluster
+        run: |
+          kubectl apply -f kubernetes/deployment.yml
+          kubectl apply -f kubernetes/service.yml
+          
+          # Force Kubernetes to do a rolling update to the new image tag immediately
+          kubectl rollout status deployment/signup-app
