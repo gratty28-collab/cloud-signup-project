@@ -230,3 +230,72 @@ resource "aws_security_group_rule" "eks_nodeport_inbound" {
 
   description = "Allow AWS Load Balancer to route traffic to Kubernetes NodePorts"
 }
+
+# 1. Fetch the TLS certificate from the EKS OIDC issuer (Required for the OIDC Provider)
+data "tls_certificate" "eks" {
+  url = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
+
+# 2. Create the OIDC Provider so IAM trusts your EKS Cluster
+resource "aws_iam_openid_connect_provider" "eks" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.eks.certificates[0].sha1_fingerprint]
+  url             = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
+
+# 3. Create the IAM Policy allowing access to DynamoDB
+resource "aws_iam_policy" "pod_dynamodb_policy" {
+  name        = "${var.project_name}-${var.environment}-ddb-policy"
+  description = "Allows EKS pods to write to the signup DynamoDB table"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem"
+        ]
+        Resource = "*" # In production, restrict this to your specific DynamoDB table ARN
+      }
+    ]
+  })
+}
+
+# 4. Create the Trust Relationship (Assume Role Policy) binding IAM to the K8s Service Account
+data "aws_iam_policy_document" "assume_role_policy" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
+
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")}:sub"
+      values   = ["system:serviceaccount:default:signup-app-service-account"]
+    }
+
+    principals {
+      identifiers = [aws_iam_openid_connect_provider.eks.arn]
+      type        = "Federated"
+    }
+  }
+}
+
+# 5. Create the IAM Role
+resource "aws_iam_role" "pod_dynamodb_role" {
+  name               = "${var.project_name}-${var.environment}-pod-role"
+  assume_role_policy = data.aws_iam_policy_document.assume_role_policy.json
+}
+
+# 6. Attach the policy to the role
+resource "aws_iam_role_policy_attachment" "ddb_attach" {
+  role       = aws_iam_role.pod_dynamodb_role.name
+  policy_arn = aws_iam_policy.pod_dynamodb_policy.arn
+}
+
+# 7. Output the Role ARN so you can use it in your Kubernetes ServiceAccount manifest
+output "app_iam_role_arn" {
+  value       = aws_iam_role.pod_dynamodb_role.arn
+  description = "Copy this ARN into your Kubernetes ServiceAccount annotation!"
+}
