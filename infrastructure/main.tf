@@ -202,3 +202,19 @@ resource "aws_dynamodb_table" "users" {
     Environment = var.environment
   }
 }
+
+# Create the ECR Repository for the Application Images
+resource "aws_ecr_repository" "app_repo" {
+  name                 = "cloud-signup-app"
+  image_tag_mutability = "MUTABLE"
+
+  # Enforces scanning images for vulnerabilities on push (Great interview talking point!)
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Environment = "production"
+    Project     = "cloud-signup"
+  }
+}
