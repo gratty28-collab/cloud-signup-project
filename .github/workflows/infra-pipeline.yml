@@ -1,0 +1,69 @@
+name: "1. Infrastructure Deployment"
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'infrastructure/**' ]
+  pull_request:
+    branches: [ main ]
+    paths: [ 'infrastructure/**' ]
+
+jobs:
+  # JOB 1: Plan the changes (Always runs automatically)
+  terraform-plan:
+    name: "Terraform Plan"
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: 'us-east-1'
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./infrastructure
+
+      - name: Terraform Plan
+        run: terraform plan -input=false
+        working-directory: ./infrastructure
+
+  # JOB 2: Apply the changes (PAUSES for manual approval)
+  terraform-apply:
+    name: "Terraform Apply"
+    needs: terraform-plan # Must wait for the plan job to finish successfully
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    # This line triggers the manual approval gate we set up in GitHub!
+    environment: production 
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: 'us-east-1'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./infrastructure
+
+      # This will only execute after you click "Approve" in the GitHub UI
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false
+        working-directory: ./infrastructure
