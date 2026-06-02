@@ -14,6 +14,8 @@ spec:
       labels:
         app: signup-app
     spec:
+      # CRITICAL: Drop this line in right here!
+      serviceAccountName: signup-app-service-account
       containers:
       - name: signup-app
         # The pipeline will automatically overwrite the 'latest' tag with the specific GitHub commit SHA
