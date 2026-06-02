@@ -165,7 +165,7 @@ resource "aws_iam_role_policy_attachment" "node_policies" {
     "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
     "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess" # Gives pods permission to write to DynamoDB
   ])
-  policy_arn = insurance_policy_arn = each.value
+  policy_arn = each.value
   role       = aws_iam_role.eks_nodes.name
 }
 
