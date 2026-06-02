@@ -6,6 +6,14 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  # Stores infrastructure state securely in AWS S3
+  backend "s3" {
+    bucket         = "terraformstatefile-kego" # Change this to a unique bucket name you own
+    key            = "prod/infrastructure.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+  }
 }
 
 provider "aws" {
