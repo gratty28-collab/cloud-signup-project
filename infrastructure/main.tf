@@ -218,3 +218,15 @@ resource "aws_ecr_repository" "app_repo" {
     Project     = "cloud-signup"
   }
 }
+
+# Automatically allow incoming Load Balancer traffic to EKS Worker NodePorts
+resource "aws_security_group_rule" "eks_nodeport_inbound" {
+  type              = "ingress"
+  from_port         = 30000
+  to_port           = 32767
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"] # In production, you'd restrict this to the LB security group
+  security_group_id = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+
+  description = "Allow AWS Load Balancer to route traffic to Kubernetes NodePorts"
+}
