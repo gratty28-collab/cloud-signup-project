@@ -19,7 +19,7 @@ spec:
       containers:
       - name: signup-app
         # The pipeline will automatically overwrite the 'latest' tag with the specific GitHub commit SHA
-        image: 352183399586.dkr.ecr.us-east-1.amazonaws.com/cloud-signup-app:latest
+        image: 822849401718.dkr.ecr.us-east-1.amazonaws.com/cloud-signup-app:latest
         ports:
         - containerPort: 3000
         env:
