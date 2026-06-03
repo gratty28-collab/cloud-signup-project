@@ -9,7 +9,7 @@ terraform {
 
   # Stores infrastructure state securely in AWS S3
   backend "s3" {
-    bucket         = "terraformstatefile-kego" # Change this to a unique bucket name you own
+    bucket         = "terraformstatefile-kego-modi" # Change this to a unique bucket name you own
     key            = "prod/infrastructure.tfstate"
     region         = "us-east-1"
     encrypt        = true
