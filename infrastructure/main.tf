@@ -214,7 +214,7 @@ resource "aws_ecr_repository" "app_repo" {
   }
 
   tags = {
-    Environment = "production"
+    Environment = "prod"
     Project     = "cloud-signup"
   }
 }
